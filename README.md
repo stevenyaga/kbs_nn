@@ -16,6 +16,6 @@ h2. Code Structure
 
 * [Fleet.csv](data/content/fleet.csv) contains the original raw data before transformation
 * [Fleet_Modified.csv](data/content/fleet_modified.csv) contains the data summed up by years. This is the data the system uses for training and validation
-* [Predict Fleet](kbs_nn/kbs_nn/doctype/predict_fleet/) contains the files that renders on the client. The user will set the neural network values from here
-* [neural_networks.py](kbs_nn/kbs_nn/neural_networks.py) contains the neural network logic
-* [utils.py](kbs_nn/kbs_nn/utils.py) contains methods to facilitate loading of data from file as well as persisting the results onto files
+* [Predict Fleet](kbs_nn/kbs_nn/doctype/predict_fleet/) directory contains the files that renders on the client. The user will set the neural network values from here
+* [neural_networks.py](kbs_nn/neural_networks.py) contains the neural network logic
+* [utils.py](kbs_nn/utils.py) contains methods to facilitate loading of data from file as well as persisting the results onto files
