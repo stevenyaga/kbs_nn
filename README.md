@@ -21,7 +21,7 @@ The following are the steps taken to implement the neural network
 * [Predict Fleet](kbs_nn/kbs_nn/doctype/predict_fleet/) directory contains the files that renders on the client. The user will set the neural network values from here
 * [neural_networks.py](kbs_nn/neural_network.py) contains the neural network logic
 * [utils.py](kbs_nn/utils.py) contains methods to facilitate loading of data from file as well as persisting the results onto files
-* [System Architecture.pdf](System Architecture.pdf) contains the system architecture
+* [System Architecture.pdf](System_Architecture.pdf) contains the system architecture
 
 ### Testing the model
 
