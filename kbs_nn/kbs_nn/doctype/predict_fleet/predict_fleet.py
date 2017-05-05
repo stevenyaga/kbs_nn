@@ -13,9 +13,9 @@ class PredictFleet(Document):
 		cp = NeuralNetwork();
 		cp.train({
 			'training_size': cint(self.inputs), 				
-			'bias': 0.03,			
 			'max_iterations': cint(self.iterations),
-			'learning_rate':  self.learning_rate
+			'learning_rate':  self.learning_rate,
+			'bias': self.bias
 		}, do_predict=True)
 
 		return {'accuracy': cp.accuracy, 'predicted_value': cp.predicted_value}		

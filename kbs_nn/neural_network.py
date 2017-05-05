@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 import numpy as np
 import utils as utils
+import json
 
 TRAINING_RECORDS = 25 #number of records to use as training set
 
@@ -17,13 +18,13 @@ class NeuralNetwork:
 		'''
 		self.training_size = 3 		
 		self.hidden_layers = 1 #do not change this
-		self.bias = 0.01	
 		self.weights = []	
 		self.max_iterations = 10000 #: Maximum iterations to stop endless looping
 		self.learning_rate = 0.07
+		self.bias = 1
 		self.accuracy = 0 #updated after the training and validation is completed		
 		self.predicted_value = None
-	
+
 	
 	def override_defaults(self, args):
 		"""
@@ -38,10 +39,13 @@ class NeuralNetwork:
 		set the initial random weights
 		"""
 		'''seed random numbers for uniformity'''
-		np.random.seed(1)
+		#np.random.seed(1)
 
-		'''set initial weights between 0 and 1'''
+		'''set initial weights between 0 and 1. #add one more weight coz of the bias'''
 		self.weights = 2 * np.random.random((self.training_size, 1)) - 1	
+
+		utils.write_to_log("Initial weights", single_space=True)
+		utils.write_to_log("{0}".format(str(self.weights)), single_space=False)
 
 	
 	def update_weights(self, weights):
@@ -69,8 +73,27 @@ class NeuralNetwork:
 		"""
 		Train the network 
 		"""
+		def log_nn_config():
+			"""
+			Write the neural netwoek config to file to allow user to download the file
+			"""
+			conf = {}
+			conf["inputs"] = self.training_size
+			conf["max_iterations"] = self.max_iterations
+			conf["bias"] = self.bias
+			conf["learning_rate"] = self.learning_rate
+
+			"""write to log"""
+			utils.write_to_log('*****NEURAL NETWORK CONFIG*****', single_space=True)
+			utils.write_to_log(json.dumps(conf, indent=4))	
+		
 		if args: #override default settings
 			self.override_defaults(args)
+		
+		utils.clear_log_file()
+		log_nn_config()
+		''' '''
+		utils.write_to_log('*****ERROR VALUE TRACE*****', single_space=False)
 
 		training_set, validation_set = utils.load_data(TRAINING_RECORDS)
 		
@@ -79,9 +102,11 @@ class NeuralNetwork:
 		validation_chunks = get_chunks(validation_set, self.training_size)
 
 		'''initialize weights'''
-		self.initialize_weights()		
+		self.initialize_weights()				
 
 		inputs, outputs = self.extract_inputs_and_outputs(training_chunks)
+
+		global_error = 0
 		
 		for x in xrange(self.max_iterations):
 			ly0 = inputs #layer 0 is the inputs layer
@@ -90,20 +115,28 @@ class NeuralNetwork:
 			#print "weights = {0}".format(self.weights)
 			'''get dot product of the weights and inputs. ly_1 is the hidden layer'''
 			ly1 = self.forward_propagate(ly0)
-
+			
 			'''get the resulting error'''
-			ly1_error = outputs - ly1		
-
+			ly1_error = outputs - ly1	
+						
 			'''gradient descent. learning rate determines how fast we descend'''			
 			ly1_change = ly1_error * self.learning_rate * sigmoid(ly1, True)
 
 			#print "ly1_change = {0}".format(ly1_change)
 
 			#import pdb; pdb.set_trace()
-			# get new update weights
+			# get new weights
 			new_weights =  np.dot(ly0.T, ly1_change)
 
+			#import pdb; pdb.set_trace()
 			self.update_weights(new_weights)
+			
+
+			'''log the error results every 10000th iteration'''
+			if x > 0 and (x + 1) % 10000 == 0:
+				utils.write_to_log("Error after iteration {0}".format(x), single_space=True)
+				utils.write_to_log("{0}".format(str(ly1_error)), single_space=False)
+
 
 		#validate model
 		self.validate_model(validation_chunks)
@@ -113,10 +146,27 @@ class NeuralNetwork:
 			to predict the next fleet of buses, use the most recent self.training_size years which is the same as 
 			picking the last chunk in the validation_chunks
 			'''		
-			self.predicted_value = self.predict([validation_chunks[-1]])
-			print "Ouput after prediction"
-			print self.predicted_value
+			inputs = validation_chunks[-1]
+			self.predicted_value = self.predict([inputs])
+
+			'''log prediction results'''
+			utils.write_to_log("*****PREDICTION*****")
+			'''remove the last element which is the target output'''
+			utils.write_to_log("Inputs = {0}".format(str(np.delete(inputs, self.training_size))), single_space=True)						
+			utils.write_to_log("Trained Weights = {0}".format(str(self.weights)), single_space=True)						
+			utils.write_to_log("Predicted value = {0}".format(self.predicted_value), single_space=False)
+
+		self.make_data_available_for_download()
+
 	
+	def make_data_available_for_download(self):
+		"""
+		generates links in the browser to download:
+		1. training data by clicking "Download training data" button in the predict fleet page
+		2. Log of the activities of the neural network during prediction including the user settings 
+		"""	
+		'''upload the files...they could have been deleted'''	
+		utils.upload_log_file()
 
 	def validate_model(self, validation_set):
 		"""
@@ -136,14 +186,22 @@ class NeuralNetwork:
 		"""
 		inputs, targets = self.extract_inputs_and_outputs(dataset)
 		output = self.forward_propagate(inputs)		
-		return output[0][0]
+		return np.ceil(output)[0][0]
 
 
 	def forward_propagate(self, inputs):
 		"""
 		gets the weighted sum of all inputs and the NN weights
 		"""
-		return sigmoid(np.dot(inputs, self.weights))
+		return sigmoid(self.calculate_output(inputs)) # np.dot(inputs, self.weights) + np.random.random())# self.bias)
+
+
+	def calculate_output(self, inputs, local_error=1):
+		"""
+		Gets the weighted product of inputs and weights adjusted by the bias
+		"""		
+		self.bias = (1 * np.random.random((1)) - 1)[0]
+		return np.dot(inputs, self.weights) + self.bias * local_error
 
 
 	# def get_training_and_validation_chunks(dataset):
@@ -190,152 +248,12 @@ def sigmoid(x, get_derivative=False):
 
 @frappe.whitelist()
 def predict_kbs_fleet():
+	"""
+	whitelists this method so that it can be called using Ajax
+	"""
 	cp = NeuralNetwork();
 	cp.train({
 		training_size: 5, 				
-		bias: 0.03,			
 		max_iterations: 60000,
 		learning_rate: 0.07		
 	}, do_predict=True)
-
-# def do_predict(iterations=2, hidden_layers=1, training_size=3):
-# 	"""
-# 	Do prediction of the following year fleet
-# 	:param iterations: Maximum iterations to stop endless looping
-# 	:param hidden_layers: Number of hidden layers. 
-# 	:param training_size: Also can be considered as the number of inputs. see load_data()
-# 	:return:
-# 	"""
-
-# 	'''seed random numbers for uniformity'''
-# 	np.random.seed(1)	
-
-# 	training_set, validation_set = load_data()
-	
-# 	'''break the training set into chunks. Add 1 to capture the 4th element as the output'''
-# 	training_chunks = get_training_chunks(training_set, training_size)#[training_set[x:x+training_size + 1] for x in xrange(0, len(training_set), training_size + 1)]
-	
-# 	'''set initial weights between 0 and 1'''
-# 	layer_weights = 2 * np.random.random((training_size, 1)) - 1	
-
-# 	X = np.array([x[0:training_size] for x in training_chunks])
-# 	Y = np.array([x[training_size:] for x in training_chunks])
-
-# 	for x in xrange(iterations):
-# 		'''@TODO train with all training chunks'''
-# 		#output = [x[training_size] for x in training_chunks]
-# 		#for chunk in training_chunks:
-
-# 		'''inputs are the first 3 elements. the 4 element is the target'''
-# 		layer_0 = X #np.array(training_chunks[0][:3])
-
-# 		'''get dot product of the weights and number of fleets'''
-# 		layer_1 = sigmoid(np.dot(layer_0, layer_weights))
-		
-# 		layer_1_error = Y - layer_1
-
-# 		#gradient descent
-# 		layer1_change = layer_1_error * sigmoid(layer_1, True)
-
-# 		#modify weights
-# 		layer_weights += np.dot(layer_0.T, layer1_change)
-
-# 	print "Output after training"
-# 	print layer_1
-
-# def sigmoid(x, derivative=False):
-# 	"""
-# 	sigmoid function to ensure continuous values
-# 	"""
-# 	if(derivative == True):
-# 		return x*(1-x)
-# 	return 1 / (1+np.exp(-x))
-
-
-# def validate_code():
-# 	import numpy as np
-
-# 	# sigmoid function
-# 	def nonlin(x,deriv=False):
-# 		if(deriv==True):
-# 		    return x*(1-x)
-# 		return 1/(1+np.exp(-x))
-
-# 	# input dataset
-# 	X = np.array([  [0,0,1],
-# 	            [0,1,1],
-# 	            [1,0,1],
-# 	            [1,1,1] ])
-
-# 	# output dataset            
-# 	y = np.array([[0,0,1,1]]).T
-
-# 	# seed random numbers to make calculation
-# 	# deterministic (just a good practice)
-# 	np.random.seed(1)
-
-# 	# initialize weights randomly with mean 0
-# 	syn0 = 2*np.random.random((3,1)) - 1
-# 	for iter in xrange(10000):
-
-# 		# forward propagation
-# 		l0 = X
-# 		l1 = nonlin(np.dot(l0,syn0))
-
-# 		# how much did we miss?
-# 		l1_error = y - l1
-# 		# multiply how much we missed by the 
-# 		# slope of the sigmoid at the values in l1
-# 		l1_delta = l1_error * nonlin(l1,True)
-
-# 		# update weights
-# 		syn0 += np.dot(l0.T,l1_delta)
-
-# 	print "Output After Training:"
-# 	print l1
-
-
-# def validate_code_mine():
-# 	import numpy as np
-
-# 	# sigmoid function
-# 	def nonlin(x,deriv=False):		
-# 		if(deriv==True):
-# 		    return x*(1-x)
-# 		return 1/(1+np.exp(-x))
-
-# 	# input dataset
-# 	X = np.array([  
-# 				[0,0,100],
-# 	            [0,12,13],
-# 	            [41,0,18],
-# 	            [51,16,17] ])
-
-# 	# output dataset            
-# 	y = np.array([[0,0,1,1]]).T
-
-# 	# seed random numbers to make calculation
-# 	# deterministic (just a good practice)
-# 	np.random.seed(1)
-
-# 	# initialize weights randomly with mean 0
-# 	syn0 = 2*np.random.random((3,1)) - 1
-# 	import pdb; pdb.set_trace()
-# 	for iter in xrange(10000):
-
-# 		# forward propagation
-# 		l0 = X
-# 		l1 = nonlin(np.dot(l0,syn0))
-
-# 		# how much did we miss?
-# 		l1_error = y - l1
-
-# 		# multiply how much we missed by the 
-# 		# slope of the sigmoid at the values in l1
-# 		l1_delta = l1_error * nonlin(l1,True)
-
-# 		# update weights
-# 		syn0 += np.dot(l0.T,l1_delta)
-
-# 	print "Output After Training:"
-# 	print l1
