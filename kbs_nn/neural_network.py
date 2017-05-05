@@ -111,8 +111,6 @@ class NeuralNetwork:
 		for x in xrange(self.max_iterations):
 			ly0 = inputs #layer 0 is the inputs layer
 			
-			#print "ly0 = {0}".format(ly0)
-			#print "weights = {0}".format(self.weights)
 			'''get dot product of the weights and inputs. ly_1 is the hidden layer'''
 			ly1 = self.forward_propagate(ly0)
 			
@@ -121,20 +119,15 @@ class NeuralNetwork:
 						
 			'''gradient descent. learning rate determines how fast we descend'''			
 			ly1_change = ly1_error * self.learning_rate * sigmoid(ly1, True)
-
-			#print "ly1_change = {0}".format(ly1_change)
-
-			#import pdb; pdb.set_trace()
+			
 			# get new weights
 			new_weights =  np.dot(ly0.T, ly1_change)
 
-			#import pdb; pdb.set_trace()
-			self.update_weights(new_weights)
-			
+			self.update_weights(new_weights)			
 
 			'''log the error results every 10000th iteration'''
 			if x > 0 and (x + 1) % 10000 == 0:
-				utils.write_to_log("Error after iteration {0}".format(x), single_space=True)
+				utils.write_to_log("Error after iteration {0}".format(x+1), single_space=True)
 				utils.write_to_log("{0}".format(str(ly1_error)), single_space=False)
 
 
