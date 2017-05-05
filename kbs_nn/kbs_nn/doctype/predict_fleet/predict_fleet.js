@@ -7,13 +7,13 @@ frappe.ui.form.on('Predict Fleet', {
 	},
 	onload_post_render: function(frm){
 		frm.fields_dict.predict.$input.addClass('btn-primary')	
-		frm.toggle_display(['download_log_file', false])
+		frm.toggle_display(['download_log_file'], false)
 	}
 });
 
 frappe.ui.form.on("Predict Fleet", "predict", function(frm) {
 	knbs_nn.neural.check_mandatory_to_fetch(frm.doc);
-	frm.toggle_display(['download_log_file', false])
+	frm.toggle_display(['download_log_file'], false)
     return frappe.call({
 		method: 'do_predict',
 		doc: frm.doc,
@@ -24,7 +24,7 @@ frappe.ui.form.on("Predict Fleet", "predict", function(frm) {
 			frappe.model.set_value(frm.doc.doctype, frm.doc.name, 'predicted_value', r.message.predicted_value);
 			frappe.model.set_value(frm.doc.doctype, frm.doc.name, 'accuracy', r.message.accuracy);
 			
-			frm.toggle_display(['download_log_file', true])			
+			frm.toggle_display(['download_log_file'], true)			
 		}
 	});
 });
